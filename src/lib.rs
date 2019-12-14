@@ -1,28 +1,21 @@
 extern crate time;
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error};
+use std::io::{BufRead, BufReader};
 
 mod timeguess;
-
-fn extract_time(row: String, delim: char, col: usize) -> String {
-    row.split(delim)
-        .nth(col)
-        .expect("Couldn't get column from row")
-        .to_string()
-}
 
 fn formatted_time(
     row: String,
     delim: char,
     col: usize,
 ) -> Result<time::Timespec, time::ParseError> {
-    let t = extract_time(row, delim, col);
+    let t = row
+        .split(delim)
+        .nth(col)
+        .expect("Couldn't get column from row");
     let fmt = timeguess::guess_time_format(&t);
-    match time::strptime(&t.clone(), &fmt.clone()) {
-        Ok(t) => Ok(t.to_timespec()),
-        Err(e) => Err(e),
-    }
+    time::strptime(t, &fmt).map(|t| t.to_timespec())
 }
 
 /// Infer samplerate from timestamped dataset
@@ -31,12 +24,16 @@ fn formatted_time(
 /// This is a _very_ simple approach to samplerate inference. Currently,
 /// only a handful of datetime formats are checked, so this may be a very
 /// brittle approach.
+///
+/// Errors will be one of:
+///     io::Result, from failing to open the file
+///     time::ParseError, from failing to guess the time format
 pub fn infer_samplerate(
     filename: String,
     delim: char,
     num_rows: usize,
     col: usize,
-) -> Result<f64, Error> {
+) -> Result<f64, Box<dyn ::std::error::Error>> {
     let f = File::open(&filename)?;
     let fbuf = BufReader::new(f);
     infer_iter(
@@ -47,7 +44,12 @@ pub fn infer_samplerate(
     )
 }
 
-fn infer_iter<I>(i: I, delim: char, num_rows: usize, col: usize) -> Result<f64, Error>
+fn infer_iter<I>(
+    i: I,
+    delim: char,
+    num_rows: usize,
+    col: usize,
+) -> Result<f64, Box<dyn ::std::error::Error>>
 where
     I: IntoIterator<Item = String>,
 {
@@ -57,7 +59,7 @@ where
     // Calculate the difference of neighbouring times
     // By zipping the time vector with a 1-offset time vector
     for row in i.into_iter().take(num_rows) {
-        let time = formatted_time(row, delim, col).unwrap();
+        let time = formatted_time(row, delim, col).map_err(|_| "Couldn't parse timestamp")?;
         if t_prev.is_none() {
             t_prev = Some(time);
         } else {
@@ -78,39 +80,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    extern crate time;
-
-    use super::*;
-    use timeguess::guess_time_format;
-    #[test]
-    fn guess_time() {
-        let pairs: Vec<(String, String)> = vec![
-            (
-                "2015-07-09 23:08:08.123".to_string(),
-                "%Y-%m-%d %H:%M:%S.%f".to_string(),
-            ),
-            (
-                "150709 23:08:08.123".to_string(),
-                "%y%m%d %H:%M:%S.%f".to_string(),
-            ),
-            (
-                "20150709 23:08:08.123".to_string(),
-                "%Y%m%d %H:%M:%S.%f".to_string(),
-            ),
-            (
-                "15-07-09 23:08:08.123".to_string(),
-                "%y-%m-%d %H:%M:%S.%f".to_string(),
-            ),
-            (
-                "23:08:08.123 09-07-2015".to_string(),
-                "%H:%M:%S.%f %d-%m-%Y".to_string(),
-            ),
-        ];
-        for pair in pairs.iter() {
-            assert_eq!(pair.1, guess_time_format(&pair.0))
-        }
-    }
-
+    use super::infer_samplerate;
     #[test]
     fn infer_samplerate_from_csv() {
         let tests = vec![
