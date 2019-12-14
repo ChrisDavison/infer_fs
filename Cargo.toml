@@ -1,13 +1,13 @@
 [package]
 name = "infer_fs"
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Christopher Davison <c.jr.davison@gmail.com>"]
 description = "Simple module to infer samplerate of a dataset."
 readme = "./README.md"
 keywords = ["Samplerate", "Frequency", "Timestamp"]
 license = "MIT"
-homepage = "http://www.chrisdavison.org"
-repository = "http://www.github.com/ChrisDavison/inferfs"
+repository = "http://www.github.com/ChrisDavison/infer_fs"
+edition = "2018"
 
 [dependencies]
 time = "0.1"
