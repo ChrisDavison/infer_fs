@@ -1,6 +1,6 @@
 [package]
 name = "infer_fs"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Christopher Davison <c.jr.davison@gmail.com>"]
 description = "Simple module to infer samplerate of a dataset."
 readme = "./README.md"
